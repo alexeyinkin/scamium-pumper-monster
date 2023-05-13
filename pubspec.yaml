@@ -1,0 +1,9 @@
+name: pumpup_monster
+environment:
+  sdk: '>=2.17.0 <4.0.0'
+
+dependencies:
+  collection: ^1.17.2
+  csv: ^5.0.2
+  http: ^0.13.6
+  web3dart: ^2.6.1
