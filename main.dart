@@ -62,6 +62,7 @@ Future<void> main() async {
   final processedHashes = <String>{};
 
   DateRecord? lastRecord;
+  int deposits = 0;
 
   final files = txDir.listSync().sorted((a, b) => a.path.compareTo(b.path));
 
@@ -101,6 +102,11 @@ Future<void> main() async {
 
       switch (method) {
         case 'Deposit':
+          deposits++;
+          if (deposits <= 100) {
+            user.intPercentFromFirst100 = 100;
+          }
+
           record.bnbDeposits += valueIn;
           user.bnbDeposits += valueIn;
           break;
@@ -284,6 +290,7 @@ class User {
 
   final String address;
   double bnbDeposits = 0;
+  int intPercentFromFirst100 = 0;
 
   static int sortByBnbDepositsDesc(User a, User b) {
     return (b.bnbDeposits - a.bnbDeposits).sign.ceil();
@@ -301,36 +308,25 @@ class User {
 }
 
 class RewardBuckets {
-  final bucket200;
-  final bucket225;
-  final bucket250;
-  final bucket275;
-  final bucket300;
-
-  RewardBuckets._({
-    required this.bucket200,
-    required this.bucket225,
-    required this.bucket250,
-    required this.bucket275,
-    required this.bucket300,
-  });
-
-  RewardBuckets()
-      : this._(
-          bucket200: RewardBucket(percent: 2.00),
-          bucket225: RewardBucket(percent: 2.25),
-          bucket250: RewardBucket(percent: 2.50),
-          bucket275: RewardBucket(percent: 2.75),
-          bucket300: RewardBucket(percent: 3.00),
-        );
-
-  late final buckets = [
-    bucket200,
-    bucket225,
-    bucket250,
-    bucket275,
-    bucket300,
+  static const intPercents = [
+    200,
+    225,
+    250,
+    275,
+    300,
+    325,
+    350,
+    375,
+    400,
   ];
+
+  final buckets = <int, RewardBucket>{};
+
+  RewardBuckets() {
+    for (final intPercent in intPercents) {
+      buckets[intPercent] = RewardBucket(percent: intPercent / 100);
+    }
+  }
 
   void addUsers(Users users) {
     users._users.values.forEach(addUser);
@@ -341,25 +337,35 @@ class RewardBuckets {
   }
 
   RewardBucket getBucket(User user) {
+    return buckets[getIntPercent(user)]!;
+  }
+
+  int getIntPercent(User user) {
+    int result = getIntPercentFromDeposit(user);
+    result += user.intPercentFromFirst100;
+    return result;
+  }
+
+  int getIntPercentFromDeposit(User user) {
     final bnbDeposits = user.bnbDeposits;
 
     if (bnbDeposits >= 10) {
-      return bucket300;
+      return 300;
     }
 
     if (bnbDeposits >= 5) {
-      return bucket275;
+      return 275;
     }
 
     if (bnbDeposits >= 2.5) {
-      return bucket250;
+      return 250;
     }
 
     if (bnbDeposits >= 1) {
-      return bucket225;
+      return 225;
     }
 
-    return bucket200;
+    return 200;
   }
 
   @override
@@ -374,7 +380,7 @@ class RewardBuckets {
     ];
     buffer.writeln(headers.join('\t'));
 
-    for (final bucket in buckets) {
+    for (final bucket in buckets.values) {
       final row = [
         bucket.percent.toStringAsFixed(2),
         bucket.bnbDeposits.toStringAsFixed(2),
@@ -393,7 +399,7 @@ class RewardBuckets {
   }
 
   double getTotalDeposits() {
-    return buckets
+    return buckets.values
         .map((b) => b.bnbDeposits)
         .reduce((value, element) => value + element);
   }
@@ -401,7 +407,7 @@ class RewardBuckets {
   double getDailyReward() {
     double result = 0;
 
-    for (final bucket in buckets) {
+    for (final bucket in buckets.values) {
       result += bucket.getDailyReward();
     }
 
@@ -410,16 +416,6 @@ class RewardBuckets {
 
   double getAverageRewardRate() {
     return getDailyReward() / getTotalDeposits();
-  }
-
-  RewardBuckets clone() {
-    return RewardBuckets._(
-      bucket200: bucket200.clone(),
-      bucket225: bucket225.clone(),
-      bucket250: bucket250.clone(),
-      bucket275: bucket275.clone(),
-      bucket300: bucket300.clone(),
-    );
   }
 }
 
@@ -436,12 +432,6 @@ class RewardBucket {
   }
 
   double getDailyReward() => percent * bnbDeposits / 100;
-
-  RewardBucket clone() {
-    final result = RewardBucket(percent: percent);
-    result.bnbDeposits = bnbDeposits;
-    return result;
-  }
 }
 
 Future<T> getConstant<T>(
