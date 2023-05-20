@@ -42,6 +42,7 @@ const columns = [
   'PUMPUP/BNB',
   'BNB Daily Rewards',
   'Daily Rewards %',
+  'User Count',
 ];
 
 // Columns in BscScan transaction export:
@@ -195,6 +196,8 @@ class DateRecord {
 
   double pumpupToBnb = 0;
 
+  int userCount = 0;
+
   final rewardBuckets = RewardBuckets();
 
   void setBlockIfNewIsAfter(int newValue) {
@@ -216,6 +219,7 @@ class DateRecord {
       pumpupToBnb.toStringAsFixed(6),
       rewardBuckets.getDailyReward().toStringAsFixed(2),
       (rewardBuckets.getAverageRewardRate() * 100).toStringAsFixed(3),
+      userCount,
     ];
 
     return data.join('\t');
@@ -247,6 +251,13 @@ class DateRecord {
     pumpupToBnb = weiToDouble(
       pumpupToBnbWei,
     );
+
+    final nextPumpIdBi = await getConstant<BigInt>(
+      projectContract,
+      'nextPumpId',
+      lastBlockOfDay,
+    );
+    userCount = nextPumpIdBi.toInt() - 1;
   }
 
   BlockNum _getLastBlockOfDay() {
